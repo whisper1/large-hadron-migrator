@@ -146,10 +146,6 @@ module Lhm
         error("could not find origin table #{ @origin.name }")
       end
 
-      unless @origin.satisfies_primary_key?
-        error("origin does not satisfy primary key requirements")
-      end
-
       dest = @origin.destination_name
 
       if table?(dest)

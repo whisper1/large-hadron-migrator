@@ -18,6 +18,7 @@ module Lhm
       @connection = connection
       @stride = options[:stride] || 40_000
       @throttle = options[:throttle] || 100
+      @chunker_column = options[:chunker_column] || migration.origin.pk
       @start = options[:start] || select_start
       @limit = options[:limit] || select_limit
     end
@@ -34,7 +35,8 @@ module Lhm
     end
 
     def bottom(chunk)
-      (chunk - 1) * @stride + @start
+      value = (chunk - 1) * @stride 
+      value == 0 ? 0 : value - 1
     end
 
     def top(chunk)
@@ -44,16 +46,16 @@ module Lhm
     def copy(lowest, highest)
       "insert ignore into `#{ destination_name }` (#{ columns }) " +
       "select #{ columns } from `#{ origin_name }` " +
-      "where `id` between #{ lowest } and #{ highest }"
+      "order by  `#{@chunker_column}` limit #{ lowest },#{ highest }"
     end
 
     def select_start
-      start = connection.select_value("select min(id) from #{ origin_name }")
-      start ? start.to_i : nil
+      start = connection.select_value("select min(#{@chunker_column}) from #{ origin_name }")
+      start ? 0 : nil
     end
 
     def select_limit
-      limit = connection.select_value("select max(id) from #{ origin_name }")
+      limit = connection.select_value("select count(#{@chunker_column}) from #{ origin_name }")
       limit ? limit.to_i : nil
     end
 
@@ -63,6 +65,7 @@ module Lhm
 
   private
 
+   
     def destination_name
       @migration.destination.name
     end
@@ -95,3 +98,8 @@ module Lhm
     end
   end
 end
+
+
+
+
+
