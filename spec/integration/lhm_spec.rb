@@ -165,6 +165,28 @@ describe Lhm do
       end
     end
 
+    it 'should rename a column' do
+      table_create(:users)
+
+      execute("INSERT INTO users (username) VALUES ('a user')")
+      Lhm.change_table(:users, :atomic_switch => false) do |t|
+        t.rename_column(:username, :login)
+      end
+
+      slave do
+        table_data = table_read(:users)
+        table_data.columns["usernamer"].must_equal(nil)
+        table_read(:users).columns["login"].must_equal({
+          :type => "varchar(255)",
+          :is_nullable => "YES",
+          :column_default => nil
+        })
+
+        select_one('SELECT login from users').must_equal({"login"=> 'a user'})
+
+      end
+    end
+
     describe "parallel" do
       it "should perserve inserts during migration" do
         50.times { |n| execute("insert into users set reference = '#{ n }'") }
