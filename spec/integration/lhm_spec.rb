@@ -175,16 +175,45 @@ describe Lhm do
 
       slave do
         table_data = table_read(:users)
-        table_data.columns["usernamer"].must_equal(nil)
+        table_data.columns["username"].must_equal(nil)
         table_read(:users).columns["login"].must_equal({
           :type => "varchar(255)",
           :is_nullable => "YES",
           :column_default => nil
         })
 
-        select_one('SELECT login from users').must_equal({"login"=> 'a user'})
-
+        # DM & AR versions of select_one return different structures. The
+        # important thing if the value was copied.
+        result = select_one('SELECT login from users')
+        result = result['login'] if result.respond_to?(:has_key?)
+        result.must_equal('a user')
       end
+    end
+
+    it 'should rename a column with a default' do
+      table_create(:users)
+
+      execute("INSERT INTO users (username) VALUES ('a user')")
+      Lhm.change_table(:users, :atomic_switch => false) do |t|
+        t.rename_column(:group, :fnord)
+      end
+
+      slave do
+        table_data = table_read(:users)
+        table_data.columns["group"].must_equal(nil)
+        table_read(:users).columns["fnord"].must_equal({
+          :type => "varchar(255)",
+          :is_nullable => "YES",
+          :column_default => 'Superfriends'
+        })
+
+        # DM & AR versions of select_one return different structures. The
+        # important thing if the value was copied.
+        result = select_one('SELECT `fnord` from users')
+        result = result['fnord'] if result.respond_to?(:has_key?)
+        result.must_equal('Superfriends')
+      end
+
     end
 
     describe "parallel" do
