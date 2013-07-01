@@ -1,4 +1,4 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require 'lhm/command'
@@ -13,7 +13,6 @@ module Lhm
   # Lhm::SqlHelper.supports_atomic_switch?.
   class AtomicSwitcher
     include Command
-    include SqlHelper
 
     attr_reader :connection
 
@@ -36,14 +35,15 @@ module Lhm
     end
 
     def validate
-      unless table?(@origin.name) && table?(@destination.name)
+      unless @connection.table_exists?(@origin.name) &&
+             @connection.table_exists?(@destination.name)
         error "`#{ @origin.name }` and `#{ @destination.name }` must exist"
       end
     end
 
   private
     def execute
-      sql statements
+      @connection.sql(statements)
     end
   end
 end

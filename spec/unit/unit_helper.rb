@@ -1,7 +1,18 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require File.expand_path(File.dirname(__FILE__)) + "/../bootstrap"
+
+begin
+  require 'active_record'
+  begin
+    require 'mysql2'
+  rescue LoadError
+    require 'mysql'
+  end
+rescue LoadError
+  require 'dm-core'
+end
 
 module UnitHelper
   def fixture(name)

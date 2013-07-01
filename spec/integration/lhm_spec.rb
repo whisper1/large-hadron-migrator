@@ -1,4 +1,4 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require File.expand_path(File.dirname(__FILE__)) + '/integration_helper'
@@ -103,11 +103,21 @@ describe Lhm do
 
     it "should remove an index with a custom name" do
       Lhm.change_table(:users, :atomic_switch => false) do |t|
-        t.remove_index(:reference, :index_users_on_reference)
+        t.remove_index([:username, :group])
       end
 
       slave do
-        index?(:users, :index_users_on_reference).must_equal(false)
+        index?(:users, :index_with_a_custom_name).must_equal(false)
+      end
+    end
+
+    it "should remove an index with a custom name by name" do
+      Lhm.change_table(:users, :atomic_switch => false) do |t|
+        t.remove_index(:irrelevant_column_name, :index_with_a_custom_name)
+      end
+
+      slave do
+        index?(:users, :index_with_a_custom_name).must_equal(false)
       end
     end
 
@@ -155,16 +165,69 @@ describe Lhm do
       end
     end
 
+    it 'should rename a column' do
+      table_create(:users)
+
+      execute("INSERT INTO users (username) VALUES ('a user')")
+      Lhm.change_table(:users, :atomic_switch => false) do |t|
+        t.rename_column(:username, :login)
+      end
+
+      slave do
+        table_data = table_read(:users)
+        table_data.columns["username"].must_equal(nil)
+        table_read(:users).columns["login"].must_equal({
+          :type => "varchar(255)",
+          :is_nullable => "YES",
+          :column_default => nil
+        })
+
+        # DM & AR versions of select_one return different structures. The
+        # important thing if the value was copied.
+        result = select_one('SELECT login from users')
+        result = result['login'] if result.respond_to?(:has_key?)
+        result.must_equal('a user')
+      end
+    end
+
+    it 'should rename a column with a default' do
+      table_create(:users)
+
+      execute("INSERT INTO users (username) VALUES ('a user')")
+      Lhm.change_table(:users, :atomic_switch => false) do |t|
+        t.rename_column(:group, :fnord)
+      end
+
+      slave do
+        table_data = table_read(:users)
+        table_data.columns["group"].must_equal(nil)
+        table_read(:users).columns["fnord"].must_equal({
+          :type => "varchar(255)",
+          :is_nullable => "YES",
+          :column_default => 'Superfriends'
+        })
+
+        # DM & AR versions of select_one return different structures. The
+        # important thing if the value was copied.
+        result = select_one('SELECT `fnord` from users')
+        result = result['fnord'] if result.respond_to?(:has_key?)
+        result.must_equal('Superfriends')
+      end
+
+    end
+
     describe "parallel" do
       it "should perserve inserts during migration" do
         50.times { |n| execute("insert into users set reference = '#{ n }'") }
 
         insert = Thread.new do
           10.times do |n|
+            connect_master!
             execute("insert into users set reference = '#{ 100 + n }'")
             sleep(0.17)
           end
         end
+        sleep 2
 
         options = { :stride => 10, :throttle => 97, :atomic_switch => false }
         Lhm.change_table(:users, options) do |t|
@@ -187,6 +250,7 @@ describe Lhm do
             sleep(0.17)
           end
         end
+        sleep 2
 
         options = { :stride => 10, :throttle => 97, :atomic_switch => false }
         Lhm.change_table(:users, options) do |t|

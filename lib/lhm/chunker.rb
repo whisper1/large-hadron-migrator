@@ -1,4 +1,4 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require 'lhm/command'
@@ -35,7 +35,7 @@ module Lhm
     end
 
     def bottom(chunk)
-      value = (chunk - 1) * @stride 
+      value = (chunk - 1) * @stride + @start
       value == 0 ? 0 : value - 1
     end
 
@@ -44,14 +44,14 @@ module Lhm
     end
 
     def copy(lowest, highest)
-      "insert ignore into `#{ destination_name }` (#{ columns }) " +
-      "select #{ columns } from `#{ origin_name }` " +
-      "order by  `#{@chunker_column}` limit #{ lowest },#{ highest }"
+      "insert ignore into `#{ destination_name }` (#{ destination_columns }) " +
+      "select #{ origin_columns } from `#{ origin_name }` " +
+      "where `id` between #{ lowest } and #{ highest }"
     end
 
     def select_start
       start = connection.select_value("select min(#{@chunker_column}) from #{ origin_name }")
-      start ? 0 : nil
+      start ? start.to_i : nil
     end
 
     def select_limit
@@ -74,8 +74,12 @@ module Lhm
       @migration.origin.name
     end
 
-    def columns
-      @columns ||= @migration.intersection.joined
+    def origin_columns
+      @origin_columns ||= @migration.intersection.origin.joined
+    end
+
+    def destination_columns
+      @destination_columns ||= @migration.intersection.destination.joined
     end
 
     def validate
@@ -86,7 +90,7 @@ module Lhm
 
     def execute
       up_to do |lowest, highest|
-        affected_rows = update(copy(lowest, highest))
+        affected_rows = @connection.update(copy(lowest, highest))
 
         if affected_rows > 0
           sleep(throttle_seconds)

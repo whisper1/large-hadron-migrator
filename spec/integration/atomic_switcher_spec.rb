@@ -1,4 +1,4 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require File.expand_path(File.dirname(__FILE__)) + '/integration_helper'
@@ -14,9 +14,9 @@ describe Lhm::AtomicSwitcher do
 
   describe "switching" do
     before(:each) do
-      @origin = table_create("origin")
+      @origin      = table_create("origin")
       @destination = table_create("destination")
-      @migration = Lhm::Migration.new(@origin, @destination)
+      @migration   = Lhm::Migration.new(@origin, @destination)
     end
 
     it "rename origin to archive" do

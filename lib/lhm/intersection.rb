@@ -1,38 +1,51 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 module Lhm
   #  Determine and format columns common to origin and destination.
   class Intersection
-    def initialize(origin, destination)
+    def initialize(origin, destination, renames = {})
       @origin = origin
       @destination = destination
+      @renames = renames
     end
+
+    def origin
+      (common + @renames.keys).extend(Joiners)
+    end
+
+    def destination
+      (common + @renames.values).extend(Joiners)
+    end
+
+    private
 
     def common
       (@origin.columns.keys & @destination.columns.keys).sort
     end
 
-    def escaped
-      common.map { |name| tick(name)  }
-    end
+    module Joiners
+      def escaped
+        self.map { |name| tick(name)  }
+      end
 
-    def joined
-      escaped.join(", ")
-    end
+      def joined
+        escaped.join(", ")
+      end
 
-    def typed(type)
-      common.map { |name| qualified(name, type)  }.join(", ")
-    end
+      def typed(type)
+        self.map { |name| qualified(name, type)  }.join(", ")
+      end
 
-  private
+    private
 
-    def qualified(name, type)
-      "#{ type }.`#{ name }`"
-    end
+      def qualified(name, type)
+        "#{ type }.`#{ name }`"
+      end
 
-    def tick(name)
-      "`#{ name }`"
+      def tick(name)
+        "`#{ name }`"
+      end
     end
   end
 end

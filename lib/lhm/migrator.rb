@@ -1,4 +1,4 @@
-# Copyright (c) 2011, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
+# Copyright (c) 2011 - 2013, SoundCloud Ltd., Rany Keddo, Tobias Bielohlawek, Tobias
 # Schmidt
 
 require 'lhm/command'
@@ -13,13 +13,14 @@ module Lhm
     include Command
     include SqlHelper
 
-    attr_reader :name, :statements, :connection
+    attr_reader :name, :statements, :connection, :renames
 
     def initialize(table, connection = nil)
       @connection = connection
       @origin = table
       @name = table.destination_name
       @statements = []
+      @renames = {}
     end
 
     # Alter a table with a custom statement
@@ -67,6 +68,28 @@ module Lhm
     # @param [String] definition Valid SQL column definition
     def change_column(name, definition)
       ddl("alter table `%s` modify column `%s` %s" % [@name, name, definition])
+    end
+
+
+    # Rename an existing column.
+    #
+    # @example
+    #
+    #   Lhm.change_table(:users) do |m|
+    #     m.rename_column(:login, :username)
+    #   end
+    #
+    # @param [String] old Name of the column to change
+    # @param [String] nu New name to use for the column
+    def rename_column(old, nu)
+      col = @origin.columns[old.to_s]
+
+      definition = col[:type]
+      definition += " NOT NULL" unless col[:is_nullable]
+      definition += " DEFAULT #{@connection.quote_value(col[:column_default])}" if col[:column_default]
+
+      ddl("alter table `%s` change column `%s` `%s` %s" % [@name, old, nu, definition])
+      @renames[old.to_s] = nu.to_s
     end
 
     # Remove a column from a table
@@ -135,6 +158,9 @@ module Lhm
     # @param [String, Symbol] index_name
     #   Optional name of the index to be removed
     def remove_index(columns, index_name = nil)
+      columns = [columns].flatten.map(&:to_sym)
+      from_origin = @origin.indices.find {|name, cols| cols.map(&:to_sym) == columns}
+      index_name ||= from_origin[0] unless from_origin.nil?
       index_name ||= idx_name(@origin.name, columns)
       ddl("drop index `%s` on `%s`" % [index_name, @name])
     end
@@ -142,28 +168,25 @@ module Lhm
   private
 
     def validate
-      unless table?(@origin.name)
+      unless @connection.table_exists?(@origin.name)
         error("could not find origin table #{ @origin.name }")
       end
 
       dest = @origin.destination_name
 
-      if table?(dest)
+      if @connection.table_exists?(dest)
         error("#{ dest } should not exist; not cleaned up from previous run?")
       end
     end
 
     def execute
       destination_create
-      sql(@statements)
-      Migration.new(@origin, destination_read)
+      @connection.sql(@statements)
+      Migration.new(@origin, destination_read, renames)
     end
 
     def destination_create
-      original = "CREATE TABLE `#{ @origin.name }`"
-      replacement = "CREATE TABLE `#{ @origin.destination_name }`"
-
-      sql(@origin.ddl.gsub(original, replacement))
+      @connection.destination_create(@origin)
     end
 
     def destination_read
