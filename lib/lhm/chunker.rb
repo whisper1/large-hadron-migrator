@@ -44,9 +44,9 @@ module Lhm
     end
 
     def copy(lowest, highest)
-      "insert ignore into `#{ destination_name }` (#{ destination_columns }) " +
+     "insert ignore into `#{ destination_name }` (#{ destination_columns }) " +
       "select #{ origin_columns } from `#{ origin_name }` " +
-      "where `id` between #{ lowest } and #{ highest }"
+      "order by  `#{@chunker_column}` limit #{ lowest },#{ highest }"
     end
 
     def select_start
