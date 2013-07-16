@@ -55,11 +55,17 @@ module Lhm
     end
 
     def create_delete_trigger
+      if @origin.pk.is_a? Array
+        where_clause = @origin.pk.collect {|pk| "`#{ @destination.name }`.`#{pk}` = OLD.`#{pk}`"}.join(" and ")
+      else
+        where_clause = "`#{ @destination.name }`.`#{@destination.pk}` = OLD.`#{@origin.pk}`"
+      end
+
       strip %Q{
         create trigger `#{ trigger(:del) }`
         after delete on `#{ @origin.name }` for each row
         delete ignore from `#{ @destination.name }` #{ SqlHelper.annotation }
-        where `#{ @destination.name }`.`#{@destination.pk}` = OLD.`#{@origin.pk}`
+        where #{where_clause}
       }
     end
 
