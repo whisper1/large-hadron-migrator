@@ -51,7 +51,7 @@ module Lhm
 
     def select_start
       start = connection.select_value("select min(#{@chunker_column}) from #{ origin_name }")
-      start ? start.to_i : nil
+      start ? 0 : nil
     end
 
     def select_limit
